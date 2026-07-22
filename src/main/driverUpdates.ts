@@ -3,22 +3,18 @@ import log from "electron-log"
 import { executePowerShell, executePowerShellStreaming } from "@main/powershell"
 import { detectGPU } from "@main/gpu"
 import { mainWindow } from "@main/windowState"
-import {
-  buildSearchScript,
-  buildInstallScript,
-  parseSearchOutput,
-  UPDATE_ID_PATTERN,
-  type WindowsUpdateItem,
-} from "@main/windowsUpdate"
 import { checkNvidiaDriverUpdate } from "@main/nvidiaDriver"
-import {
-  buildInstalledDriversScript,
-  parseInstalledDriversOutput,
-  groupInstalledDrivers,
-} from "@main/installedDrivers"
-import type { GpuDriverStatus, DriverVendorGroup } from "../types"
+import type { GpuDriverStatus } from "../types"
 
 const logo = "[Sparkle main/driverUpdates.ts]:"
+
+// Deliberately scoped to GPU drivers sourced directly from the vendor, not
+// Windows Update -- a general Windows-Update-driven driver inventory was
+// tried and dropped: Windows' own driver catalog is well behind what GPU
+// vendors ship directly (a fresh Windows 11 + Nvidia install ships
+// 2024-era drivers), and enumerating all installed hardware via WMI plus a
+// Windows Update search added real, noticeable latency for a payoff that was
+// mostly showing stale version numbers.
 
 // Verified against winget/msstore directly during development -- neither
 // vendor's actual driver-update app ("NVIDIA App", "AMD Software:
@@ -126,50 +122,6 @@ export async function launchInstalledApp(nameHint: string): Promise<boolean> {
 }
 
 export const setupDriverUpdatesHandlers = (): void => {
-  ipcMain.handle("driver-updates:check", async () => {
-    try {
-      const [wuResult, installedResult] = await Promise.all([
-        executePowerShell(null, { script: buildSearchScript("Driver"), name: "wu-driver-search" }),
-        executePowerShell(null, { script: buildInstalledDriversScript(), name: "installed-drivers" }),
-      ])
-
-      const parsed = wuResult.success ? parseSearchOutput(wuResult.output ?? "") : { items: [] as WindowsUpdateItem[] }
-      if (parsed.error) log.warn(logo, "driver search reported:", parsed.error)
-
-      const installedRows = installedResult.success ? parseInstalledDriversOutput(installedResult.output ?? "") : []
-      const vendorGroups: DriverVendorGroup[] = groupInstalledDrivers(installedRows, parsed.items)
-
-      return { success: true, updates: parsed.items, vendorGroups }
-    } catch (error: any) {
-      log.error(logo, "driver-updates:check failed:", error)
-      return { success: false, updates: [], vendorGroups: [], error: error?.message ?? String(error) }
-    }
-  })
-
-  ipcMain.handle("driver-updates:install", async (event, { updateIds }: { updateIds: string[] }) => {
-    const ids = (Array.isArray(updateIds) ? updateIds : []).filter((id) => UPDATE_ID_PATTERN.test(id))
-    if (ids.length === 0) return { success: false, error: "No valid update ids provided" }
-
-    const appId = "windows-driver-batch"
-    sendToRenderer("install-start", { appId })
-    try {
-      const result = await executePowerShellStreaming(event, {
-        script: buildInstallScript(ids),
-        name: "install-drivers",
-        appId,
-      })
-      sendToRenderer(result.success ? "install-app-complete" : "install-app-error", { appId })
-      sendToRenderer("install-complete")
-      return { success: result.success }
-    } catch (error: any) {
-      log.error(logo, "driver-updates:install failed:", error)
-      sendToRenderer("install-output", { appId, line: error?.message ?? String(error) })
-      sendToRenderer("install-app-error", { appId })
-      sendToRenderer("install-complete")
-      return { success: false, error: error?.message ?? String(error) }
-    }
-  })
-
   ipcMain.handle("gpu-driver:check", async () => {
     try {
       return { success: true, ...(await checkGpuDriverStatus()) }
@@ -226,8 +178,6 @@ export const setupDriverUpdatesHandlers = (): void => {
 }
 
 export const cleanupDriverUpdatesHandlers = (): void => {
-  ipcMain.removeHandler("driver-updates:check")
-  ipcMain.removeHandler("driver-updates:install")
   ipcMain.removeHandler("gpu-driver:check")
   ipcMain.removeHandler("gpu-driver:download")
   ipcMain.removeHandler("gpu-driver:launch-app")

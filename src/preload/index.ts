@@ -5,12 +5,7 @@ const INVOKABLE_CHANNELS = new Set([
   // appUpdates.ts
   "app-updates:check",
   "app-updates:upgrade",
-  // osUpdates.ts
-  "os-updates:check",
-  "os-updates:install",
   // driverUpdates.ts
-  "driver-updates:check",
-  "driver-updates:install",
   "gpu-driver:check",
   "gpu-driver:download",
   "gpu-driver:launch-app",

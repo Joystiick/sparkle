@@ -71,17 +71,6 @@ export interface AppUpdate {
   truncated?: boolean
 }
 
-export interface WindowsUpdateItem {
-  updateId: string
-  title: string
-  kb: string
-  type: "Driver" | "Software"
-  sizeBytes: number
-  driverProvider?: string
-  driverClass?: string
-  driverVerDate?: string
-}
-
 export interface NvidiaDriverInfo {
   supported: boolean
   reason?: string
@@ -90,19 +79,6 @@ export interface NvidiaDriverInfo {
   releaseDate?: string
   downloadUrl?: string
   downloadSizeText?: string
-}
-
-export interface InstalledDriverDevice {
-  deviceName: string
-  driverVersion: string
-  driverDate: string
-  deviceClass: string
-  updateId?: string
-}
-
-export interface DriverVendorGroup {
-  vendor: string
-  devices: InstalledDriverDevice[]
 }
 
 export interface GpuDriverStatus {

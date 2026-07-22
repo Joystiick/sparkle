@@ -4,7 +4,6 @@ import RootDiv from "@/components/rootdiv"
 import { Table, TableHeader, TableRow, TableHead, TableBody } from "@/components/ui/table"
 import Button from "@/components/ui/button"
 import { LargeInput } from "@/components/ui/input"
-import OsUpdateCard from "@/components/OsUpdateCard"
 import DriversTab from "@/components/DriversTab"
 import { invoke } from "@/lib/electron"
 import useAppUpdatesStore from "@/store/appUpdatesStore"
@@ -130,11 +129,6 @@ function AppUpdates() {
           }}
         />
       </div>
-
-      {/* Shown regardless of which tab is active -- Windows Update isn't
-          app- or driver-specific, and hiding it behind a tab meant it was
-          easy to miss entirely. */}
-      <OsUpdateCard />
 
       {subTab === "apps" ? (
         wingetInstalled === false ? (

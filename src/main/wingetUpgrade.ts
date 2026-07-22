@@ -55,12 +55,20 @@ export function buildUpgradeScript(target: {
   ].join("\n")
 }
 
-// Upgrading App Installer replaces winget.exe itself mid-batch, which kills
-// any upgrades still queued behind it — so it always goes last.
+// Upgrading App Installer replaces winget.exe itself mid-batch, which would
+// break any other winget process still using the old binary -- including
+// other upgrades running concurrently, not just ones queued after it. Kept
+// as its own export so callers doing concurrent batches can pull this one
+// item out and run it in isolation rather than relying on array order.
+export function isWingetSelfUpgrade(id: string): boolean {
+  return /^Microsoft\.(DesktopAppInstaller|AppInstaller)$/i.test(id)
+}
+
 export function orderUpgradeTargets<T extends { id: string }>(targets: T[]): T[] {
-  const isWingetItself = (t: T): boolean =>
-    /^Microsoft\.(DesktopAppInstaller|AppInstaller)$/i.test(t.id)
-  return [...targets.filter((t) => !isWingetItself(t)), ...targets.filter(isWingetItself)]
+  return [
+    ...targets.filter((t) => !isWingetSelfUpgrade(t.id)),
+    ...targets.filter((t) => isWingetSelfUpgrade(t.id)),
+  ]
 }
 
 export function parseWingetUpgradeOutput(raw: string): AppUpdate[] {

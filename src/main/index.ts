@@ -9,7 +9,6 @@ import { setupDNSHandlers } from "@main/dnsHandler"
 import { setupBackupHandlers } from "@main/backup"
 import { setupDebloatHandlers } from "@main/debloat"
 import { setupAppUpdatesHandlers } from "@main/appUpdates"
-import { setupOsUpdatesHandlers } from "@main/osUpdates"
 import { setupDriverUpdatesHandlers } from "@main/driverUpdates"
 import { initAutoUpdater } from "@main/updates"
 import { setMainWindow } from "@main/windowState"
@@ -152,7 +151,6 @@ app
     setupBackupHandlers()
     setupDebloatHandlers()
     setupAppUpdatesHandlers()
-    setupOsUpdatesHandlers()
     setupDriverUpdatesHandlers()
     console.log("[Sparkle]: Handlers setup complete")
 

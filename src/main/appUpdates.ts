@@ -6,11 +6,12 @@ import { mainWindow } from "@main/windowState"
 import {
   buildUpgradeListScript,
   buildUpgradeScript,
-  orderUpgradeTargets,
+  isWingetSelfUpgrade,
   parseWingetUpgradeOutput,
   SAFE_WINGET_ID,
 } from "@main/wingetUpgrade"
 import { buildOutdatedScript, buildChocoUpgradeScript, parseChocoOutdatedOutput } from "@main/chocoUpgrade"
+import { getSystemConcurrency, runWithConcurrency } from "@main/updateConcurrency"
 import type { AppUpdate } from "../types"
 
 const logo = "[Sparkle main/appUpdates.ts]:"
@@ -110,7 +111,7 @@ export const setupAppUpdatesHandlers = (): void => {
       const targets = Array.isArray(apps) ? apps : []
       const results: Array<{ id: string; success: boolean }> = []
 
-      for (const target of orderUpgradeTargets(targets)) {
+      async function upgradeOne(target: UpgradeTarget): Promise<void> {
         const appId = target.id
 
         // These ids are interpolated into an elevated PowerShell script, so a
@@ -121,7 +122,7 @@ export const setupAppUpdatesHandlers = (): void => {
           sendToRenderer("install-output", { appId, line: `Invalid package id: ${appId}` })
           sendToRenderer("install-app-error", { appId })
           results.push({ id: appId, success: false })
-          continue
+          return
         }
 
         sendToRenderer("install-start", { appId })
@@ -149,6 +150,22 @@ export const setupAppUpdatesHandlers = (): void => {
           results.push({ id: appId, success: false })
         }
       }
+
+      // Winget's own package replaces winget.exe when it upgrades, which
+      // would break any other winget process still using the old binary --
+      // including ones running concurrently in this same batch, not just
+      // ones queued after it. So it's pulled out and run alone, strictly
+      // after every other winget/choco upgrade has fully finished, never
+      // alongside them.
+      const parallelTargets = targets.filter((t) => !isWingetSelfUpgrade(t.id))
+      const isolatedTargets = targets.filter((t) => isWingetSelfUpgrade(t.id))
+
+      // How many run at once scales with the machine: weak/old hardware gets
+      // sequential (1 at a time), powerful hardware runs several in parallel.
+      const concurrency = getSystemConcurrency()
+      log.info(logo, `upgrading ${parallelTargets.length} app(s) with concurrency ${concurrency}`)
+      await runWithConcurrency(parallelTargets, concurrency, upgradeOne)
+      await runWithConcurrency(isolatedTargets, 1, upgradeOne)
 
       sendToRenderer("install-complete")
       return { success: true, results }
